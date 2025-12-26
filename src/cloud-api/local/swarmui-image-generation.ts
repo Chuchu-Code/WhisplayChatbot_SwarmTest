@@ -16,6 +16,7 @@ export interface SwarmUIGenerateRequest {
   width?: number;
   height?: number;
   scheduler?: string;
+  sampler?: string;
   model?: string;
   images?: number;
   donotsave?: boolean;
@@ -125,6 +126,10 @@ export const addSwarmUIGenerationTool = (imageGenerationTools: LLMTool[]) => {
 
         if (process.env.SWARMUI_MODEL) {
           requestBody.model = process.env.SWARMUI_MODEL;
+        }
+
+        if (process.env.SWARMUI_SAMPLER) {
+          requestBody.sampler = process.env.SWARMUI_SAMPLER;
         }
 
         // Call SwarmUI API

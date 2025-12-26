@@ -26,6 +26,7 @@ SWARMUI_GUIDANCE_SCALE=7.5          # Guidance scale (how strictly to follow the
 SWARMUI_WIDTH=512                   # Image width in pixels
 SWARMUI_HEIGHT=512                  # Image height in pixels
 SWARMUI_SCHEDULER=normal            # Scheduler type
+SWARMUI_SAMPLER=                    # Sampler method (e.g., euler, heun, lms, dpmpp, etc.)
 ```
 
 ### 2. SwarmUI Setup
@@ -64,6 +65,7 @@ All SwarmUI parameters are configurable via environment variables:
 | Width | `SWARMUI_WIDTH` | 512 | Output image width |
 | Height | `SWARMUI_HEIGHT` | 512 | Output image height |
 | Scheduler | `SWARMUI_SCHEDULER` | normal | Scheduler algorithm |
+| Sampler | `SWARMUI_SAMPLER` | (auto) | Sampler method (e.g., euler, heun, lms, dpmpp) |
 | Model | `SWARMUI_MODEL` | (auto) | Specific model to use |
 
 ## Example Environment Configuration
@@ -76,6 +78,7 @@ SWARMUI_STEPS=30
 SWARMUI_GUIDANCE_SCALE=8.0
 SWARMUI_WIDTH=768
 SWARMUI_HEIGHT=768
+SWARMUI_SAMPLER=euler
 ```
 
 ## Troubleshooting
