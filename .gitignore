@@ -1,0 +1,14 @@
+node_modules
+data
+tts_temp
+.env
+emoji_svg
+NotoSansSC-Bold.ttf
+cloud-api/speech.mp3
+python/emoji_svg.zip
+dist
+python/__pycache__/
+chatbot.log
+use_ollama
+use_npm
+package-lock.json

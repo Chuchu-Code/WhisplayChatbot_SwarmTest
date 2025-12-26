@@ -1,0 +1,5 @@
+Pillow
+cairosvg
+numpy
+spidev
+opencv-python-headless
