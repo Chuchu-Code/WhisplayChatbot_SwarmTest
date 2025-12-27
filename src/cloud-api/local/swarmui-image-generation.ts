@@ -109,11 +109,17 @@ export const addSwarmUIGenerationTool = (imageGenerationTools: LLMTool[]) => {
         // Get session ID
         const sessionId = await getSwarmSession(baseUrl);
 
+        // Append positive and negative prompt suffixes
+        const positivePromptSuffix = process.env.SWARMUI_POSITIVE_PROMPT_SUFFIX || "";
+        const negativePromptSuffix = process.env.SWARMUI_NEGATIVE_PROMPT_SUFFIX || "";
+        const finalPrompt = prompt + (positivePromptSuffix ? ", " + positivePromptSuffix : "");
+        const finalNegativePrompt = negativePrompt + (negativePromptSuffix ? ", " + negativePromptSuffix : "");
+
         // Prepare request
         const requestBody: SwarmUIGenerateRequest = {
           session_id: sessionId,
-          prompt,
-          negativeprompt: negativePrompt,
+          prompt: finalPrompt,
+          negativeprompt: finalNegativePrompt,
           steps: parseInt(process.env.SWARMUI_STEPS || "20", 10),
           cfgscale: parseFloat(process.env.SWARMUI_GUIDANCE_SCALE || "7.5"),
           width: parseInt(process.env.SWARMUI_WIDTH || "512", 10),
@@ -130,6 +136,11 @@ export const addSwarmUIGenerationTool = (imageGenerationTools: LLMTool[]) => {
 
         if (process.env.SWARMUI_SAMPLER) {
           requestBody.sampler = process.env.SWARMUI_SAMPLER;
+        }
+
+        console.log(`Generating image with prompt: "${finalPrompt}"`);
+        if (finalNegativePrompt) {
+          console.log(`Negative prompt: "${finalNegativePrompt}"`);
         }
 
         // Call SwarmUI API

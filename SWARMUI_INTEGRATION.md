@@ -27,6 +27,8 @@ SWARMUI_WIDTH=512                   # Image width in pixels
 SWARMUI_HEIGHT=512                  # Image height in pixels
 SWARMUI_SCHEDULER=normal            # Scheduler type
 SWARMUI_SAMPLER=                    # Sampler method (e.g., euler, heun, lms, dpmpp, etc.)
+SWARMUI_POSITIVE_PROMPT_SUFFIX=     # Text to append to all positive prompts
+SWARMUI_NEGATIVE_PROMPT_SUFFIX=     # Text to append to all negative prompts
 ```
 
 ### 2. SwarmUI Setup
@@ -66,6 +68,8 @@ All SwarmUI parameters are configurable via environment variables:
 | Height | `SWARMUI_HEIGHT` | 512 | Output image height |
 | Scheduler | `SWARMUI_SCHEDULER` | normal | Scheduler algorithm |
 | Sampler | `SWARMUI_SAMPLER` | (auto) | Sampler method (e.g., euler, heun, lms, dpmpp) |
+| Positive Prompt Suffix | `SWARMUI_POSITIVE_PROMPT_SUFFIX` | (empty) | Text appended to all positive prompts |
+| Negative Prompt Suffix | `SWARMUI_NEGATIVE_PROMPT_SUFFIX` | (empty) | Text appended to all negative prompts |
 | Model | `SWARMUI_MODEL` | (auto) | Specific model to use |
 
 ## Example Environment Configuration
@@ -79,6 +83,8 @@ SWARMUI_GUIDANCE_SCALE=8.0
 SWARMUI_WIDTH=768
 SWARMUI_HEIGHT=768
 SWARMUI_SAMPLER=euler
+SWARMUI_POSITIVE_PROMPT_SUFFIX=high quality, detailed
+SWARMUI_NEGATIVE_PROMPT_SUFFIX=blurry, low quality
 ```
 
 ## Troubleshooting
