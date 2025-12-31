@@ -12,8 +12,12 @@ export const recognizeAudio = async (
   }
 
   try {
+    // Read the audio file as binary data
+    const audioBuffer = fs.readFileSync(audioFilePath);
+    const audioBase64 = audioBuffer.toString("base64");
+
     const response = await axios.post(`${whisperServerUrl}/recognize`, {
-      filePath: audioFilePath,
+      audio: audioBase64,
     }, {
       timeout: 60000, // 60 second timeout for audio processing
     });
