@@ -17,6 +17,7 @@ import { recognizeAudio as GeminiASR } from "./gemini/gemini-asr";
 import { recognizeAudio as VoskASR } from "./local/vosk-asr";
 import { recognizeAudio as WisperASR } from "./local/whisper-asr";
 import { recognizeAudio as LLM8850WhisperASR } from "./local/llm8850-whisper";
+import { recognizeAudio as WhisperServerASR } from "./local/whisper-server-asr";
 import {
   chatWithLLMStream as VolcengineLLMStream,
   resetChatHistory as VolcengineResetChatHistory,
@@ -105,9 +106,12 @@ switch (asrServer) {
   case ASRServer.llm8850whisper:
     recognizeAudio = LLM8850WhisperASR;
     break;
+  case ASRServer.whisperserver:
+    recognizeAudio = WhisperServerASR;
+    break;
   default:
     console.warn(
-      `unknown asr server: ${asrServer}, should be volcengine/tencent/openai/gemini/vosk/whisper/llm8850whisper`
+      `unknown asr server: ${asrServer}, should be volcengine/tencent/openai/gemini/vosk/whisper/llm8850whisper/whisperserver`
     );
     break;
 }
