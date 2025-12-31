@@ -12,6 +12,13 @@ export const recognizeAudio = async (
   }
 
   try {
+    // Check file size and wait if needed
+    const stats = fs.statSync(audioFilePath);
+    if (stats.size === 0) {
+      console.error("Audio file is empty:", audioFilePath);
+      return "";
+    }
+    
     // Read the audio file as binary data
     const audioBuffer = fs.readFileSync(audioFilePath);
     const audioBase64 = audioBuffer.toString("base64");
