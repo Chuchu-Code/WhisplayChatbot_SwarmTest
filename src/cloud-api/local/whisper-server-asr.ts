@@ -1,6 +1,5 @@
 import axios from "axios";
 import fs from "fs";
-import FormData from "form-data";
 
 const whisperServerUrl = process.env.WHISPER_SERVER_URL || "http://localhost:9000";
 
@@ -13,17 +12,14 @@ export const recognizeAudio = async (
   }
 
   try {
-    const fileStream = fs.createReadStream(audioFilePath);
-    const formData = new FormData();
-    formData.append("file", fileStream);
-
-    const response = await axios.post(`${whisperServerUrl}/recognize`, formData, {
-      headers: formData.getHeaders(),
+    const response = await axios.post(`${whisperServerUrl}/recognize`, {
+      filePath: audioFilePath,
+    }, {
       timeout: 60000, // 60 second timeout for audio processing
     });
 
-    if (response.data && response.data.text) {
-      return response.data.text;
+    if (response.data && response.data.recognition) {
+      return response.data.recognition;
     } else {
       console.error("Unexpected response format from Whisper server:", response.data);
       return "";

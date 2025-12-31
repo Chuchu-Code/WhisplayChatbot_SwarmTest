@@ -14,6 +14,7 @@ export const recordFileFormat = [
   ASRServer.vosk,
   ASRServer.whisper,
   ASRServer.llm8850whisper,
+  ASRServer.whisperserver,
 ].includes(asrServer)
   ? "wav"
   : "mp3";
