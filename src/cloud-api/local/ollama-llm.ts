@@ -74,21 +74,31 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   const functionCallsPackages: OllamaFunctionCall[][] = [];
 
   try {
+    const requestBody: any = {
+      model: ollamaModel,
+      messages: messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+      stream: true,
+      options: {
+        temperature: 0.7,
+      },
+    };
+
+    // Only add parameters if they're supported
+    if (enableThinking) {
+      requestBody.think = enableThinking;
+    }
+    if (ollamaEnableTools && llmTools.length > 0) {
+      requestBody.tools = llmTools;
+    }
+
+    console.log("Sending to Ollama:", JSON.stringify(requestBody, null, 2));
+
     const response = await axios.post(
       `${ollamaEndpoint}/api/chat`,
-      {
-        model: ollamaModel,
-        messages: messages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        think: enableThinking,
-        stream: true,
-        options: {
-          temperature: 0.7,
-        },
-        tools: ollamaEnableTools ? llmTools : [],
-      },
+      requestBody,
       {
         headers: {
           "Content-Type": "application/json",
@@ -225,7 +235,12 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       }
     });
   } catch (error: any) {
-    console.error("Error:", error.message);
+    console.error("Error calling Ollama:", error.message);
+    if (error.response) {
+      console.error("Response status:", error.response.status);
+      console.error("Response data:", error.response.data);
+    }
+    console.error("Full error:", error);
     endResolve();
     endCallback();
   }

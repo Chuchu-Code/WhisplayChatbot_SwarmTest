@@ -109,11 +109,11 @@ export const addSwarmUIGenerationTool = (imageGenerationTools: LLMTool[]) => {
         // Get session ID
         const sessionId = await getSwarmSession(baseUrl);
 
-        // Append positive and negative prompt suffixes
-        const positivePromptSuffix = process.env.SWARMUI_POSITIVE_PROMPT_SUFFIX || "";
-        const negativePromptSuffix = process.env.SWARMUI_NEGATIVE_PROMPT_SUFFIX || "";
-        const finalPrompt = prompt + (positivePromptSuffix ? ", " + positivePromptSuffix : "");
-        const finalNegativePrompt = negativePrompt + (negativePromptSuffix ? ", " + negativePromptSuffix : "");
+        // Prepend positive and negative prompt prefixes
+        const positivePromptPrefix = process.env.SWARMUI_POSITIVE_PROMPT_PREFIX || "";
+        const negativePromptPrefix = process.env.SWARMUI_NEGATIVE_PROMPT_PREFIX || "";
+        const finalPrompt = (positivePromptPrefix ? positivePromptPrefix + ", " : "") + prompt;
+        const finalNegativePrompt = (negativePromptPrefix ? negativePromptPrefix + ", " : "") + negativePrompt;
 
         // Prepare request
         const requestBody: SwarmUIGenerateRequest = {

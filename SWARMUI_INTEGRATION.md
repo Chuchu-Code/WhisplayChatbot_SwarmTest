@@ -27,8 +27,8 @@ SWARMUI_WIDTH=512                   # Image width in pixels
 SWARMUI_HEIGHT=512                  # Image height in pixels
 SWARMUI_SCHEDULER=normal            # Scheduler type
 SWARMUI_SAMPLER=                    # Sampler method (e.g., euler, heun, lms, dpmpp, etc.)
-SWARMUI_POSITIVE_PROMPT_SUFFIX=     # Text to append to all positive prompts
-SWARMUI_NEGATIVE_PROMPT_SUFFIX=     # Text to append to all negative prompts
+SWARMUI_POSITIVE_PROMPT_PREFIX=     # Text to prepend to all positive prompts
+SWARMUI_NEGATIVE_PROMPT_PREFIX=     # Text to prepend to all negative prompts
 ```
 
 ### 2. SwarmUI Setup
@@ -68,8 +68,8 @@ All SwarmUI parameters are configurable via environment variables:
 | Height | `SWARMUI_HEIGHT` | 512 | Output image height |
 | Scheduler | `SWARMUI_SCHEDULER` | normal | Scheduler algorithm |
 | Sampler | `SWARMUI_SAMPLER` | (auto) | Sampler method (e.g., euler, heun, lms, dpmpp) |
-| Positive Prompt Suffix | `SWARMUI_POSITIVE_PROMPT_SUFFIX` | (empty) | Text appended to all positive prompts |
-| Negative Prompt Suffix | `SWARMUI_NEGATIVE_PROMPT_SUFFIX` | (empty) | Text appended to all negative prompts |
+| Positive Prompt Prefix | `SWARMUI_POSITIVE_PROMPT_PREFIX` | (empty) | Text prepended to all positive prompts |
+| Negative Prompt Prefix | `SWARMUI_NEGATIVE_PROMPT_PREFIX` | (empty) | Text prepended to all negative prompts |
 | Model | `SWARMUI_MODEL` | (auto) | Specific model to use |
 
 ## Example Environment Configuration
