@@ -15,9 +15,9 @@ from utils import ColorUtils, ImageUtils, TextUtils
 scroll_thread = None
 scroll_stop_event = threading.Event()
 
-status_font_size=24
-emoji_font_size=40
-battery_font_size=13
+status_font_size=20
+emoji_font_size=32
+battery_font_size=14
 
 # Global variables
 current_status = "Hello"
@@ -46,7 +46,7 @@ class RenderThread(threading.Thread):
         # Clear logo after 1 second and start running loop
         time.sleep(1)
         self.running = True
-        self.main_text_font = ImageFont.truetype(self.font_path, 20)
+        self.main_text_font = ImageFont.truetype(self.font_path, 16)
         self.main_text_line_height = self.main_text_font.getmetrics()[0] + self.main_text_font.getmetrics()[1]
         self.text_cache_image = None
         self.current_render_text = ""
@@ -125,7 +125,7 @@ class RenderThread(threading.Thread):
         if not text:
             return
         # Use main text font
-        font = ImageFont.truetype(self.font_path, 20)
+        font = ImageFont.truetype(self.font_path, 16)
         lines = TextUtils.wrap_text(draw, text, font, self.whisplay.LCD_WIDTH - 20)
 
         # Line height
