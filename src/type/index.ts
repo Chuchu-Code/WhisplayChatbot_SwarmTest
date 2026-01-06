@@ -39,6 +39,7 @@ export enum TTSServer {
   gemini = "gemini",
   piper = "piper",
   llm8850melotts = "llm8850melotts",
+  fastkokoro = "fastkokoro",
 }
 
 export enum ImageGenerationServer {
