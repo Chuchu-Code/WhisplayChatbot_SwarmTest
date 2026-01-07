@@ -24,7 +24,6 @@ const fastKokoroTTS = async (
   }
 
   try {
-    // Request non-streaming full file and ask for download link
     const response = await axios.post(
       `${fastKokoroServerUrl}/v1/audio/speech`,
       {
@@ -33,34 +32,14 @@ const fastKokoroTTS = async (
         voice: fastKokoroVoice,
         response_format: fastKokoroResponseFormat,
         speed: fastKokoroSpeed,
-        stream: false,  // Disable streaming - get full file
-        return_download_link: true,  // Request a download link
       },
       {
         responseType: "arraybuffer",
-        timeout: 60000,  // Increase timeout for full file generation
+        timeout: 30000,
       }
     );
 
-    // Check if server provided a download link in headers
-    const downloadPath = response.headers["x-download-path"];
-    let buffer: Buffer;
-    
-    if (downloadPath && typeof downloadPath === "string") {
-      // Follow the download link to get the full file
-      const downloadUrl = downloadPath.startsWith("http")
-        ? downloadPath
-        : `${fastKokoroServerUrl}${downloadPath}`;
-      console.log(`Downloading full audio from: ${downloadUrl}`);
-      const downloadResponse = await axios.get(downloadUrl, {
-        responseType: "arraybuffer",
-        timeout: 60000,
-      });
-      buffer = Buffer.from(downloadResponse.data);
-    } else {
-      // Fallback: assume response body is the full audio
-      buffer = Buffer.from(response.data);
-    }
+    const buffer = Buffer.from(response.data);
 
     // Calculate duration based on audio format
     let duration = 0;
