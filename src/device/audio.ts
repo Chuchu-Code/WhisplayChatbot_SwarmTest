@@ -206,9 +206,7 @@ const player: Player = {
   process: null,
 };
 
-setTimeout(() => {
-  player.process = startPlayerProcess();
-}, 5000);
+// Player will be created on-demand when needed for playback
 
 const playAudioData = (params: TTSResult): Promise<void> => {
   const { duration: audioDuration, filePath, base64, buffer } = params;
@@ -248,18 +246,23 @@ const playAudioData = (params: TTSResult): Promise<void> => {
   return new Promise((resolve, reject) => {
     const audioBuffer = base64 ? Buffer.from(base64, "base64") : buffer;
     console.log("Playback duration:", audioDuration);
+    
+    // Create player on-demand if not exists
+    if (!player.process) {
+      player.process = startPlayerProcess();
+    }
+    const process = player.process;
+
+    if (!process) {
+      return reject(new Error("Audio player could not be initialized."));
+    }
+    
     player.isPlaying = true;
     setTimeout(() => {
       resolve();
       player.isPlaying = false;
       console.log("Audio playback completed");
     }, audioDuration); // Add 1 second buffer
-
-    const process = player.process;
-
-    if (!process) {
-      return reject(new Error("Audio player is not initialized."));
-    }
 
     try {
       process.stdin?.write(audioBuffer);
@@ -280,23 +283,17 @@ const playAudioData = (params: TTSResult): Promise<void> => {
 };
 
 const stopPlaying = (): void => {
-  if (player.isPlaying) {
-    try {
-      console.log("Stopping audio playback");
-      const process = player.process;
-      if (process) {
-        process.stdin?.end();
-        process.kill();
-      }
-    } catch {}
-    player.isPlaying = false;
-    // Recreate process
-    setTimeout(() => {
-      player.process = startPlayerProcess();
-    }, 500);
-  } else {
-    console.log("No audio currently playing");
-  }
+  try {
+    console.log("Stopping audio playback");
+    const process = player.process;
+    if (process) {
+      process.stdin?.end();
+      process.kill();
+    }
+  } catch {}
+  player.isPlaying = false;
+  player.process = null;
+  // Player will be recreated on-demand when next playback starts
 };
 
 // Close audio player when exiting program
