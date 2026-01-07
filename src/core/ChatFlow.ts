@@ -13,7 +13,7 @@ import {
   getCurrentStatus,
   onCameraCapture,
 } from "../device/display";
-import { recordAudioManually, recordFileFormat, stopPlaying } from "../device/audio";
+import { recordAudioManually, recordFileFormat, stopPlaying as stopAudioPlayback } from "../device/audio";
 import {
   recognizeAudio,
   chatWithLLMStream,
@@ -134,7 +134,7 @@ class ChatFlow {
         this.answerId += 1;
         this.currentFlowName = "listening";
         // Stop playback to release ALSA device before recording
-        stopPlaying();
+        stopAudioPlayback();
         this.currentRecordFilePath = `${
           this.recordingsDir
         }/user-${Date.now()}.${recordFileFormat}`;
