@@ -258,11 +258,24 @@ const playAudioData = (params: TTSResult): Promise<void> => {
     }
     
     player.isPlaying = true;
-    setTimeout(() => {
-      resolve();
+    
+    // Kill player after playback completes to release ALSA device
+    const cleanupPlayer = () => {
       player.isPlaying = false;
-      console.log("Audio playback completed");
-    }, audioDuration); // Add 1 second buffer
+      try {
+        if (player.process) {
+          player.process.stdin?.end();
+          player.process.kill();
+        }
+      } catch (e) {}
+      player.process = null;
+      console.log("Audio playback completed, player cleaned up");
+    };
+    
+    setTimeout(() => {
+      cleanupPlayer();
+      resolve();
+    }, audioDuration);
 
     try {
       process.stdin?.write(audioBuffer);
@@ -270,12 +283,11 @@ const playAudioData = (params: TTSResult): Promise<void> => {
     process.stdout?.on("data", (data) => console.log(data.toString()));
     process.stderr?.on("data", (data) => console.error(data.toString()));
     process.on("exit", (code) => {
-      player.isPlaying = false;
+      cleanupPlayer();
       if (code !== 0) {
         console.error(`Audio playback error: ${code}`);
         reject(code);
       } else {
-        console.log("Audio playback completed");
         resolve();
       }
     });
