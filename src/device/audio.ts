@@ -272,17 +272,24 @@ const playAudioData = (params: TTSResult): Promise<void> => {
       console.log("Audio playback completed, player cleaned up");
     };
     
-    setTimeout(() => {
-      cleanupPlayer();
-      resolve();
-    }, audioDuration);
+    // Fallback timeout: kill player after 1 minute max
+    const fallbackTimeout = setTimeout(() => {
+      if (player.isPlaying) {
+        console.warn("Playback timeout (60s) reached, forcing cleanup");
+        cleanupPlayer();
+        resolve();
+      }
+    }, 60000); // 60 second maximum
 
     try {
       process.stdin?.write(audioBuffer);
+      // Signal end of input so mpg123 exits after playing
+      process.stdin?.end();
     } catch (e) {}
     process.stdout?.on("data", (data) => console.log(data.toString()));
     process.stderr?.on("data", (data) => console.error(data.toString()));
     process.on("exit", (code) => {
+      clearTimeout(fallbackTimeout);
       cleanupPlayer();
       if (code !== 0) {
         console.error(`Audio playback error: ${code}`);
