@@ -2,10 +2,7 @@ import { purifyTextForTTS, splitSentences } from "../utils";
 import dotenv from "dotenv";
 import { playAudioData, stopPlaying } from "../device/audio";
 import { TTSResult } from "../type";
-import { spawn } from "child_process";
-import path from "path";
 import fs from "fs";
-import { ttsDir } from "../utils/dir";
 
 dotenv.config();
 
@@ -19,7 +16,7 @@ export class StreamResponser {
   private textCallback?: TextCallback;
   private partialContent: string = "";
   private playEndResolve: () => void = () => {};
-  private speakArray: Promise<TTSResult>[] = [];
+  private ttsPromise: Promise<TTSResult> | null = null;
   private parsedSentences: string[] = [];
   private isPlaying: boolean = false;
 
@@ -52,41 +49,6 @@ export class StreamResponser {
     return 0;
   };
 
-  private combineWavFiles = (filePaths: string[]): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      if (filePaths.length === 0) {
-        reject(new Error("No WAV files to combine"));
-        return;
-      }
-      if (filePaths.length === 1) {
-        resolve(filePaths[0]);
-        return;
-      }
-
-      const outputPath = path.join(ttsDir, `combined_${Date.now()}.wav`);
-      const soxProcess = spawn("sox", [...filePaths, outputPath]);
-
-      let stderr = "";
-      soxProcess.stderr?.on("data", (data) => {
-        stderr += data.toString();
-      });
-
-      soxProcess.on("close", (code: number) => {
-        if (code === 0) {
-          console.log(`Combined ${filePaths.length} WAV files into ${outputPath}`);
-          resolve(outputPath);
-        } else {
-          console.error("sox error:", stderr);
-          reject(new Error(`sox failed with code ${code}`));
-        }
-      });
-
-      soxProcess.on("error", (err) => {
-        reject(err);
-      });
-    });
-  };
-
   private playAudioInOrder = async (): Promise<void> => {
     if (this.isPlaying) {
       console.log("Audio playback already in progress, skipping duplicate call");
@@ -95,44 +57,36 @@ export class StreamResponser {
 
     this.isPlaying = true;
     try {
-      // Wait for all TTS promises to resolve
-      const ttsResults = await Promise.all(this.speakArray);
-      
-      // Extract file paths from results
-      const filePaths = ttsResults
-        .filter((result) => result.filePath)
-        .map((result) => result.filePath!);
-
-      if (filePaths.length === 0) {
-        console.log("No audio files generated");
+      if (!this.ttsPromise) {
+        console.log("No audio to play");
         this.isPlaying = false;
         this.playEndResolve();
         return;
       }
 
-      // Combine WAV files if multiple, or use single file
-      console.log(`Starting WAV file combination (${filePaths.length} files)...`);
-      const combineStartTime = Date.now();
-      const audioPath = filePaths.length > 1 
-        ? await this.combineWavFiles(filePaths)
-        : filePaths[0];
-      const combineTime = Date.now() - combineStartTime;
-      console.log(`WAV combination completed in ${combineTime}ms`);
+      // Wait for TTS to complete
+      const ttsResult = await this.ttsPromise;
+      
+      if (!ttsResult.filePath) {
+        console.log("No audio file generated");
+        this.isPlaying = false;
+        this.playEndResolve();
+        return;
+      }
 
-      // Get actual duration from the combined/single WAV file
-      const actualDuration = this.getWavDuration(audioPath);
+      // Get actual duration from the WAV file
+      const actualDuration = this.getWavDuration(ttsResult.filePath);
       // Generous buffer for low-powered devices and playback variance
       const durationWithBuffer = actualDuration + 15000; // Add 15 second safety buffer
 
-      // Play combined audio - timer starts now, after combining is complete
+      // Play audio - timer starts now, after TTS is complete
       console.log(`Playing audio (actual: ${actualDuration}ms + 15s buffer = ${durationWithBuffer}ms)`);
-      await playAudioData({ filePath: audioPath, duration: durationWithBuffer });
+      await playAudioData({ filePath: ttsResult.filePath, duration: durationWithBuffer });
 
       console.log("Play completed");
       this.isPlaying = false;
       this.playEndResolve();
-      this.speakArray.length = 0;
-      this.speakArray = [];
+      this.ttsPromise = null;
     } catch (error) {
       console.error("Audio playback error:", error);
       this.isPlaying = false;
@@ -144,17 +98,12 @@ export class StreamResponser {
     this.partialContent += text;
     // replace newlines with spaces
     this.partialContent = this.partialContent.replace(/\n/g, " ");
+    
+    // Split into sentences for display purposes only
     const { sentences, remaining } = splitSentences(this.partialContent);
     if (sentences.length > 0) {
       this.parsedSentences.push(...sentences);
       this.sentencesCallback?.(this.parsedSentences);
-      // remove emoji
-      const filteredSentences = sentences
-        .map(purifyTextForTTS)
-        .filter((item) => item !== "");
-      this.speakArray.push(
-        ...filteredSentences.map((item) => this.ttsFunc(item))
-      );
     }
     this.partialContent = remaining;
   };
@@ -163,24 +112,27 @@ export class StreamResponser {
     if (this.partialContent) {
       this.parsedSentences.push(this.partialContent);
       this.sentencesCallback?.(this.parsedSentences);
-      // remove emoji
-      this.partialContent = this.partialContent.replace(
-        /[\u{1F600}-\u{1F64F}]/gu,
-        ""
-      );
-      if (this.partialContent.trim() !== "") {
-        const text = purifyTextForTTS(this.partialContent);
-        this.speakArray.push(this.ttsFunc(text));
-      }
-      this.partialContent = "";
     }
-    this.textCallback?.(this.parsedSentences.join(" "));
-    this.parsedSentences.length = 0;
     
-    // Start playback after all sentences are collected
-    if (!this.isPlaying && this.speakArray.length > 0) {
-      this.playAudioInOrder();
+    // Combine all text and make single TTS request
+    const fullText = this.parsedSentences.join(" ");
+    this.textCallback?.(fullText);
+    
+    if (fullText.trim() !== "") {
+      const purifiedText = purifyTextForTTS(fullText);
+      console.log(`Sending complete text to TTS (${purifiedText.length} characters)`);
+      this.ttsPromise = this.ttsFunc(purifiedText);
+      
+      // Start playback after TTS request is made
+      if (!this.isPlaying) {
+        this.playAudioInOrder();
+      }
+    } else {
+      this.playEndResolve();
     }
+    
+    this.partialContent = "";
+    this.parsedSentences.length = 0;
   };
 
   getPlayEndPromise = (): Promise<void> => {
@@ -190,8 +142,7 @@ export class StreamResponser {
   };
 
   stop = (): void => {
-    this.speakArray = [];
-    this.speakArray.length = 0;
+    this.ttsPromise = null;
     this.partialContent = "";
     this.parsedSentences.length = 0;
     this.isPlaying = false;
