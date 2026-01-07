@@ -234,11 +234,12 @@ const playAudioData = (params: TTSResult): Promise<void> => {
         } catch (e) {}
       };
       
-      // Fallback timeout
+      // Fallback timeout - add larger buffer for combined audio
       const timeout = setTimeout(() => {
+        console.warn(`Audio playback timeout (${audioDuration + 5000}ms) reached`);
         cleanup();
         resolve();
-      }, audioDuration + 2000);
+      }, audioDuration + 5000);
       
       wavProcess.on("close", (code: number) => {
         clearTimeout(timeout);

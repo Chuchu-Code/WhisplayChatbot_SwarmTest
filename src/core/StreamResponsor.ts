@@ -33,6 +33,25 @@ export class StreamResponser {
     this.textCallback = textCallback;
   }
 
+  private getWavDuration = (filePath: string): number => {
+    try {
+      const buffer = fs.readFileSync(filePath);
+      if (buffer.length >= 44) {
+        const sampleRate = buffer.readUInt32LE(24);
+        const channels = buffer.readUInt16LE(22);
+        const bitsPerSample = buffer.readUInt16LE(34);
+        const bytesPerSample = (bitsPerSample / 8) * channels;
+        const numSamples = (buffer.length - 44) / bytesPerSample;
+        const duration = (numSamples / sampleRate) * 1000; // milliseconds
+        console.log(`WAV file duration: ${duration}ms (${(duration / 1000).toFixed(2)}s)`);
+        return duration;
+      }
+    } catch (error) {
+      console.warn("Failed to read WAV duration:", error);
+    }
+    return 0;
+  };
+
   private combineWavFiles = (filePaths: string[]): Promise<string> => {
     return new Promise((resolve, reject) => {
       if (filePaths.length === 0) {
@@ -96,12 +115,13 @@ export class StreamResponser {
         ? await this.combineWavFiles(filePaths)
         : filePaths[0];
 
-      // Calculate total duration
-      const totalDuration = ttsResults.reduce((sum, r) => sum + r.duration, 0);
+      // Get actual duration from the combined/single WAV file
+      const actualDuration = this.getWavDuration(audioPath);
+      const durationWithBuffer = actualDuration + 5000; // Add 5 second safety buffer
 
       // Play combined audio
-      console.log("Playing combined audio");
-      await playAudioData({ filePath: audioPath, duration: totalDuration });
+      console.log(`Playing audio (actual: ${actualDuration}ms + 5s buffer = ${durationWithBuffer}ms)`);
+      await playAudioData({ filePath: audioPath, duration: durationWithBuffer });
 
       console.log("Play completed");
       this.isPlaying = false;
