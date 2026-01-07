@@ -66,7 +66,8 @@ const recordAudio = (
   duration: number = 10
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const cmd = `sox -t alsa hw:${soundCardIndex},0 -t ${recordFileFormat} -c 1 -r 16000 ${outputPath} silence 1 0.1 60% 1 1.0 60%`;
+    // Use plughw to let ALSA convert sample formats if needed and explicitly request 16-bit signed PCM
+    const cmd = `sox -t alsa plughw:${soundCardIndex},0 -t ${recordFileFormat} -c 1 -r 16000 -b 16 -e signed-integer ${outputPath} silence 1 0.1 60% 1 1.0 60%`;
     console.log(`Starting recording, maximum ${duration} seconds...`);
     const recordingProcess = exec(cmd, (err, stdout, stderr) => {
       currentRecordingReject = reject;
@@ -99,13 +100,17 @@ const recordAudioManually = (
     const recordingProcess = spawn("sox", [
       "-t",
       "alsa",
-      `hw:${soundCardIndex},0`,
+      `plughw:${soundCardIndex},0`,
       "-t",
       recordFileFormat,
       "-c",
       "1",
       "-r",
       "16000",
+      "-b",
+      "16",
+      "-e",
+      "signed-integer",
       outputPath,
     ]);
 
