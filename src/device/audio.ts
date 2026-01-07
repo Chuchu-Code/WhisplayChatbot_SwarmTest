@@ -119,13 +119,21 @@ const recordAudioManually = (
     });
     recordingProcessList.push(recordingProcess);
     stopFunc = () => {
-      killAllRecordingProcesses();
+      // Close stdin first to signal EOF to sox
+      try {
+        recordingProcess.stdin?.end();
+      } catch (e) {}
+      // Give sox a moment to finish writing before killing
+      setTimeout(() => {
+        killAllRecordingProcesses();
+      }, 200);
     };
     recordingProcess.on("exit", () => {
-      // Add small delay to ensure file is fully written to disk
+      // Wait longer to ensure file is fully written to disk
+      // and ALSA device is properly released
       setTimeout(() => {
         resolve(outputPath);
-      }, 100);
+      }, 500);
     });
   });
   return {
