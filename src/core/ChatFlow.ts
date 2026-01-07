@@ -133,9 +133,12 @@ class ChatFlow {
       case "listening":
         this.answerId += 1;
         this.currentFlowName = "listening";
-        // Stop playback to release ALSA device before recording
+        // Stop ALL audio playback to release ALSA device before recording
         stopAudioPlayback();
-        // Small delay to ensure device is fully released
+        // Call again after short delay to catch any stragglers
+        await new Promise(r => setTimeout(r, 50));
+        stopAudioPlayback();
+        // Final delay to ensure device is fully released
         await new Promise(r => setTimeout(r, 100));
         this.currentRecordFilePath = `${
           this.recordingsDir

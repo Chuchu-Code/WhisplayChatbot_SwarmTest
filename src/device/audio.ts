@@ -206,6 +206,9 @@ const player: Player = {
   process: null,
 };
 
+// Track ALL active player processes for guaranteed cleanup
+let allPlayerProcesses: ChildProcess[] = [];
+
 // Player will be created on-demand when needed for playback
 
 const playAudioData = (params: TTSResult): Promise<void> => {
@@ -216,28 +219,39 @@ const playAudioData = (params: TTSResult): Promise<void> => {
   }
   // play wav file using aplay
   if (filePath) {
-    return Promise.race([
-      new Promise<void>((resolve) => {
-        setTimeout(() => {
+    return new Promise<void>((resolve, reject) => {
+      console.log("Playback duration:", audioDuration);
+      player.isPlaying = true;
+      const wavProcess = spawn("play", [filePath]);
+      allPlayerProcesses.push(wavProcess);
+      
+      const cleanup = () => {
+        player.isPlaying = false;
+        const idx = allPlayerProcesses.indexOf(wavProcess);
+        if (idx > -1) allPlayerProcesses.splice(idx, 1);
+        try {
+          wavProcess.kill("SIGTERM");
+        } catch (e) {}
+      };
+      
+      // Fallback timeout
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, audioDuration + 2000);
+      
+      wavProcess.on("close", (code: number) => {
+        clearTimeout(timeout);
+        cleanup();
+        if (code !== 0) {
+          console.error(`Audio playback error: ${code}`);
+          reject(code);
+        } else {
+          console.log("Audio playback completed");
           resolve();
-        }, audioDuration + 1000);
-      }),
-      new Promise<void>((resolve, reject) => {
-        console.log("Playback duration:", audioDuration);
-        player.isPlaying = true;
-        const process = spawn("play", [filePath]);
-        process.on("close", (code: number) => {
-          player.isPlaying = false;
-          if (code !== 0) {
-            console.error(`Audio playback error: ${code}`);
-            reject(code);
-          } else {
-            console.log("Audio playback completed");
-            resolve();
-          }
-        });
-      }),
-    ]).catch((error) => {
+        }
+      });
+    }).catch((error) => {
       console.error("Audio playback error:", error);
     });
   }
@@ -265,6 +279,9 @@ const playAudioData = (params: TTSResult): Promise<void> => {
       return reject(new Error("Audio player could not be initialized."));
     }
     
+    // Track this process for global cleanup
+    allPlayerProcesses.push(process);
+    
     player.isPlaying = true;
     
     // Kill player after playback completes to release ALSA device
@@ -272,8 +289,10 @@ const playAudioData = (params: TTSResult): Promise<void> => {
       player.isPlaying = false;
       try {
         if (player.process) {
+          const idx = allPlayerProcesses.indexOf(player.process);
+          if (idx > -1) allPlayerProcesses.splice(idx, 1);
           player.process.stdin?.end();
-          player.process.kill();
+          player.process.kill("SIGTERM");
         }
       } catch (e) {}
       player.process = null;
@@ -310,17 +329,28 @@ const playAudioData = (params: TTSResult): Promise<void> => {
 };
 
 const stopPlaying = (): void => {
+  console.log("Stopping ALL audio playback and releasing ALSA device");
+  
+  // Kill the main tracked player
   try {
-    console.log("Stopping audio playback and releasing ALSA device");
-    const process = player.process;
-    if (process) {
-      process.stdin?.end();
-      process.kill("SIGTERM");
+    if (player.process) {
+      player.process.stdin?.end();
+      player.process.kill("SIGTERM");
     }
   } catch {}
   player.isPlaying = false;
   player.process = null;
-  // Player will be recreated on-demand when next playback starts
+  
+  // Kill ALL tracked player processes (including wav players)
+  allPlayerProcesses.forEach((proc) => {
+    try {
+      proc.stdin?.end();
+      proc.kill("SIGTERM");
+    } catch {}
+  });
+  allPlayerProcesses.length = 0;
+  
+  console.log("All player processes killed");
 };
 
 // Close audio player when exiting program
