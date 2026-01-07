@@ -1,7 +1,9 @@
 import axios from "axios";
-import mp3Duration from "mp3-duration";
+import path from "path";
+import fs from "fs";
 import dotenv from "dotenv";
 import { TTSResult } from "../../type";
+import { ttsDir } from "../../utils/dir";
 
 dotenv.config();
 
@@ -11,9 +13,10 @@ const fastKokoroModel =
   process.env.FASTKOKORO_MODEL || "kokoro";
 const fastKokoroVoice =
   process.env.FASTKOKORO_VOICE || "af_heart";
-const fastKokoroResponseFormat =
-  process.env.FASTKOKORO_RESPONSE_FORMAT || "mp3";
 const fastKokoroSpeed = parseFloat(process.env.FASTKOKORO_SPEED || "1.0");
+
+// Always use WAV format for file-based playback to avoid ALSA device contention
+const KOKORO_RESPONSE_FORMAT = "wav";
 
 const fastKokoroTTS = async (
   text: string
@@ -30,7 +33,7 @@ const fastKokoroTTS = async (
         model: fastKokoroModel,
         input: text,
         voice: fastKokoroVoice,
-        response_format: fastKokoroResponseFormat,
+        response_format: KOKORO_RESPONSE_FORMAT,
         speed: fastKokoroSpeed,
       },
       {
@@ -41,39 +44,30 @@ const fastKokoroTTS = async (
 
     const buffer = Buffer.from(response.data);
 
-    // Calculate duration based on audio format
+    // Save WAV buffer to file
+    const now = Date.now();
+    const filePath = path.join(ttsDir, `kokoro_${now}.wav`);
+    fs.writeFileSync(filePath, buffer);
+
+    // Calculate duration from WAV header
     let duration = 0;
     try {
-      if (
-        fastKokoroResponseFormat === "mp3" ||
-        fastKokoroResponseFormat === "opus" ||
-        fastKokoroResponseFormat === "aac" ||
-        fastKokoroResponseFormat === "flac"
-      ) {
-        // mp3-duration library works with common audio formats
-        duration = await mp3Duration(buffer);
-        duration = duration * 1000; // Convert to milliseconds
-      } else if (
-        fastKokoroResponseFormat === "wav" ||
-        fastKokoroResponseFormat === "pcm"
-      ) {
-        // For WAV/PCM, calculate from header information
+      if (buffer.length >= 44) {
         // WAV header: sample rate is at bytes 24-27 (little-endian)
-        // Number of samples = file size / 2 (for 16-bit mono)
-        // Duration = samples / sample rate
-        if (buffer.length >= 44) {
-          const sampleRate = buffer.readUInt32LE(24);
-          const numSamples = (buffer.length - 44) / 2; // Assuming 16-bit mono
-          duration = (numSamples / sampleRate) * 1000;
-        }
+        // Channels at bytes 22-23, bits per sample at bytes 34-35
+        const sampleRate = buffer.readUInt32LE(24);
+        const channels = buffer.readUInt16LE(22);
+        const bitsPerSample = buffer.readUInt16LE(34);
+        const bytesPerSample = (bitsPerSample / 8) * channels;
+        const numSamples = (buffer.length - 44) / bytesPerSample;
+        duration = (numSamples / sampleRate) * 1000; // Convert to milliseconds
       }
     } catch (durationError) {
       console.warn("Failed to calculate audio duration:", durationError);
-      // Default to 0 if we can't calculate
       duration = 0;
     }
 
-    return { buffer, duration };
+    return { filePath, duration };
   } catch (error) {
     console.error("FastKokoro TTS failed:", error);
     return { duration: 0 };

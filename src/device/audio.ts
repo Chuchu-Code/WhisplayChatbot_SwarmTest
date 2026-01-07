@@ -8,7 +8,7 @@ dotenv.config();
 
 const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
 
-const useWavPlayer = [TTSServer.gemini, TTSServer.piper].includes(ttsServer);
+const useWavPlayer = [TTSServer.gemini, TTSServer.piper, TTSServer.fastkokoro].includes(ttsServer);
 
 export const recordFileFormat = [
   ASRServer.vosk,
