@@ -243,9 +243,19 @@ class ChatFlow {
             }
           }
         );
-        getPlayEndPromise().then(() => {
+        getPlayEndPromise().then(async () => {
           if (this.currentFlowName === "answer") {
-            const img = getLatestDisplayImg();
+            // Wait a bit for any pending image generation to complete
+            // Check multiple times over 3 seconds
+            let img = getLatestDisplayImg();
+            if (!img) {
+              for (let i = 0; i < 12; i++) {
+                await new Promise(r => setTimeout(r, 5000));
+                img = getLatestDisplayImg();
+                if (img) break;
+              }
+            }
+            
             if (img) {
               display({
                 image: img,
