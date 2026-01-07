@@ -111,16 +111,21 @@ export class StreamResponser {
       }
 
       // Combine WAV files if multiple, or use single file
+      console.log(`Starting WAV file combination (${filePaths.length} files)...`);
+      const combineStartTime = Date.now();
       const audioPath = filePaths.length > 1 
         ? await this.combineWavFiles(filePaths)
         : filePaths[0];
+      const combineTime = Date.now() - combineStartTime;
+      console.log(`WAV combination completed in ${combineTime}ms`);
 
       // Get actual duration from the combined/single WAV file
       const actualDuration = this.getWavDuration(audioPath);
-      const durationWithBuffer = actualDuration + 5000; // Add 5 second safety buffer
+      // Generous buffer for low-powered devices and playback variance
+      const durationWithBuffer = actualDuration + 15000; // Add 15 second safety buffer
 
-      // Play combined audio
-      console.log(`Playing audio (actual: ${actualDuration}ms + 5s buffer = ${durationWithBuffer}ms)`);
+      // Play combined audio - timer starts now, after combining is complete
+      console.log(`Playing audio (actual: ${actualDuration}ms + 15s buffer = ${durationWithBuffer}ms)`);
       await playAudioData({ filePath: audioPath, duration: durationWithBuffer });
 
       console.log("Play completed");
