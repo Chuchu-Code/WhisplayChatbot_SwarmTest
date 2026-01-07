@@ -66,23 +66,35 @@ export class StreamResponser {
         return;
       }
 
+      console.log("Waiting for TTS promise to resolve...");
       // Wait for TTS to complete
-      const ttsResult = await this.ttsPromise;
+      let ttsResult: TTSResult;
+      try {
+        ttsResult = await this.ttsPromise;
+        console.log("TTS promise resolved successfully");
+      } catch (ttsError) {
+        console.error("TTS request failed:", ttsError);
+        this.isPlaying = false;
+        this.resolveAllPlayEnds();
+        throw ttsError;
+      }
       
       // Check if we were stopped while waiting
       if (this.isStopped) {
         console.log("Playback was cancelled, skipping audio playback");
         this.isPlaying = false;
+        this.resolveAllPlayEnds();
         return;
       }
       
       if (!ttsResult.filePath) {
-        console.log("No audio file generated");
+        console.log("No audio file generated from TTS");
         this.isPlaying = false;
         this.resolveAllPlayEnds();
         return;
       }
 
+      console.log("Audio file path:", ttsResult.filePath);
       // Get actual duration from the WAV file
       const actualDuration = this.getWavDuration(ttsResult.filePath);
       // Generous buffer for low-powered devices and playback variance
@@ -90,14 +102,19 @@ export class StreamResponser {
 
       // Play audio - timer starts now, after TTS is complete
       console.log(`Playing audio (actual: ${actualDuration}ms + 15s buffer = ${durationWithBuffer}ms)`);
-      await playAudioData({ filePath: ttsResult.filePath, duration: durationWithBuffer });
+      try {
+        await playAudioData({ filePath: ttsResult.filePath, duration: durationWithBuffer });
+        console.log("Audio playback completed successfully");
+      } catch (playError) {
+        console.error("Audio playback failed:", playError);
+        throw playError;
+      }
 
-      console.log("Play completed");
       this.isPlaying = false;
       this.resolveAllPlayEnds();
       this.ttsPromise = null;
     } catch (error) {
-      console.error("Audio playback error:", error);
+      console.error("Audio playback pipeline error:", error);
       this.isPlaying = false;
       this.resolveAllPlayEnds();
     }
@@ -109,6 +126,7 @@ export class StreamResponser {
   };
 
   partial = (text: string): void => {
+    console.log(`Received partial text (${text.length} chars)`);
     this.partialContent += text;
     // replace newlines with spaces
     this.partialContent = this.partialContent.replace(/\n/g, " ");
@@ -117,22 +135,26 @@ export class StreamResponser {
     const { sentences, remaining } = splitSentences(this.partialContent);
     if (sentences.length > 0) {
       this.parsedSentences.push(...sentences);
+      console.log(`Parsed ${sentences.length} sentences, total sentences: ${this.parsedSentences.length}`);
       this.sentencesCallback?.(this.parsedSentences);
     }
     this.partialContent = remaining;
   };
 
   endPartial = (): void => {
+    console.log("endPartial called");
     // Reset stopped flag for new conversation
     this.isStopped = false;
     
     if (this.partialContent) {
+      console.log(`Adding final partial content (${this.partialContent.length} chars)`);
       this.parsedSentences.push(this.partialContent);
       this.sentencesCallback?.(this.parsedSentences);
     }
     
     // Combine all text and make single TTS request
     const fullText = this.parsedSentences.join(" ");
+    console.log(`Full text for TTS (${fullText.length} chars): ${fullText.substring(0, 100)}...`);
     this.textCallback?.(fullText);
     
     if (fullText.trim() !== "") {
@@ -142,9 +164,11 @@ export class StreamResponser {
       
       // Start playback after TTS request is made
       if (!this.isPlaying) {
+        console.log("Starting playAudioInOrder");
         this.playAudioInOrder();
       }
     } else {
+      console.log("No text to send to TTS, resolving immediately");
       // Resolve immediately if no text
       this.resolveAllPlayEnds();
     }

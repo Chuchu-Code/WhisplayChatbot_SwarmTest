@@ -22,11 +22,13 @@ const fastKokoroTTS = async (
   text: string
 ): Promise<TTSResult> => {
   if (!fastKokoroServerUrl) {
-    console.error("FastKokoro Server URL is not set.");
-    return { duration: 0 };
+    const error = "FastKokoro Server URL is not set.";
+    console.error(error);
+    throw new Error(error);
   }
 
   try {
+    console.log(`FastKokoro TTS: Requesting audio for ${text.length} characters`);
     const response = await axios.post(
       `${fastKokoroServerUrl}/v1/audio/speech`,
       {
@@ -43,12 +45,14 @@ const fastKokoroTTS = async (
       }
     );
 
+    console.log(`FastKokoro TTS: Received ${response.data.byteLength} bytes`);
     const buffer = Buffer.from(response.data);
 
     // Save WAV buffer to file
     const now = Date.now();
     const filePath = path.join(ttsDir, `kokoro_${now}.wav`);
     fs.writeFileSync(filePath, buffer);
+    console.log(`FastKokoro TTS: Saved to ${filePath}`);
 
     // Calculate duration from WAV header
     let duration = 0;
@@ -62,6 +66,7 @@ const fastKokoroTTS = async (
         const bytesPerSample = (bitsPerSample / 8) * channels;
         const numSamples = (buffer.length - 44) / bytesPerSample;
         duration = (numSamples / sampleRate) * 1000; // Convert to milliseconds
+        console.log(`FastKokoro TTS: Duration ${duration}ms`);
       }
     } catch (durationError) {
       console.warn("Failed to calculate audio duration:", durationError);
@@ -71,7 +76,7 @@ const fastKokoroTTS = async (
     return { filePath, duration };
   } catch (error) {
     console.error("FastKokoro TTS failed:", error);
-    return { duration: 0 };
+    throw error; // Re-throw so caller knows it failed
   }
 };
 
