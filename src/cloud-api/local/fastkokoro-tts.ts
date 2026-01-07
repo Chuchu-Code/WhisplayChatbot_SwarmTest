@@ -35,6 +35,7 @@ const fastKokoroTTS = async (
         voice: fastKokoroVoice,
         response_format: KOKORO_RESPONSE_FORMAT,
         speed: fastKokoroSpeed,
+        stream: false, // Get complete WAV in single response to avoid pauses
       },
       {
         responseType: "arraybuffer",
