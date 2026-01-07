@@ -2,6 +2,10 @@ import { purifyTextForTTS, splitSentences } from "../utils";
 import dotenv from "dotenv";
 import { playAudioData, stopPlaying } from "../device/audio";
 import { TTSResult } from "../type";
+import { spawn } from "child_process";
+import path from "path";
+import fs from "fs";
+import { ttsDir } from "../utils/dir";
 
 dotenv.config();
 
@@ -29,41 +33,86 @@ export class StreamResponser {
     this.textCallback = textCallback;
   }
 
+  private combineWavFiles = (filePaths: string[]): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (filePaths.length === 0) {
+        reject(new Error("No WAV files to combine"));
+        return;
+      }
+      if (filePaths.length === 1) {
+        resolve(filePaths[0]);
+        return;
+      }
+
+      const outputPath = path.join(ttsDir, `combined_${Date.now()}.wav`);
+      const soxProcess = spawn("sox", [...filePaths, outputPath]);
+
+      let stderr = "";
+      soxProcess.stderr?.on("data", (data) => {
+        stderr += data.toString();
+      });
+
+      soxProcess.on("close", (code: number) => {
+        if (code === 0) {
+          console.log(`Combined ${filePaths.length} WAV files into ${outputPath}`);
+          resolve(outputPath);
+        } else {
+          console.error("sox error:", stderr);
+          reject(new Error(`sox failed with code ${code}`));
+        }
+      });
+
+      soxProcess.on("error", (err) => {
+        reject(err);
+      });
+    });
+  };
+
   private playAudioInOrder = async (): Promise<void> => {
-    // Prevent multiple concurrent calls
     if (this.isPlaying) {
       console.log("Audio playback already in progress, skipping duplicate call");
       return;
     }
-    let currentIndex = 0;
-    const playNext = async () => {
-      if (currentIndex < this.speakArray.length) {
-        this.isPlaying = true;
-        try {
-          const playParams = await this.speakArray[currentIndex];
-          console.log(
-            `Playing audio ${currentIndex + 1}/${this.speakArray.length}`
-          );
-          await playAudioData(playParams);
-        } catch (error) {
-          console.error("Audio playback error:", error);
-        }
-        currentIndex++;
-        playNext();
-      } else if (this.partialContent) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        playNext();
-      } else {
-        console.log(
-          `Play all audio completed. Total: ${this.speakArray.length}`
-        );
+
+    this.isPlaying = true;
+    try {
+      // Wait for all TTS promises to resolve
+      const ttsResults = await Promise.all(this.speakArray);
+      
+      // Extract file paths from results
+      const filePaths = ttsResults
+        .filter((result) => result.filePath)
+        .map((result) => result.filePath!);
+
+      if (filePaths.length === 0) {
+        console.log("No audio files generated");
         this.isPlaying = false;
         this.playEndResolve();
-        this.speakArray.length = 0;
-        this.speakArray = [];
+        return;
       }
-    };
-    playNext();
+
+      // Combine WAV files if multiple, or use single file
+      const audioPath = filePaths.length > 1 
+        ? await this.combineWavFiles(filePaths)
+        : filePaths[0];
+
+      // Calculate total duration
+      const totalDuration = ttsResults.reduce((sum, r) => sum + r.duration, 0);
+
+      // Play combined audio
+      console.log("Playing combined audio");
+      await playAudioData({ filePath: audioPath, duration: totalDuration });
+
+      console.log("Play completed");
+      this.isPlaying = false;
+      this.playEndResolve();
+      this.speakArray.length = 0;
+      this.speakArray = [];
+    } catch (error) {
+      console.error("Audio playback error:", error);
+      this.isPlaying = false;
+      this.playEndResolve();
+    }
   };
 
   partial = (text: string): void => {
@@ -78,15 +127,8 @@ export class StreamResponser {
       const filteredSentences = sentences
         .map(purifyTextForTTS)
         .filter((item) => item !== "");
-      const length = this.speakArray.length;
       this.speakArray.push(
-        ...filteredSentences.map((item, index) =>
-          this.ttsFunc(item).finally(() => {
-            if (length === 0 && index === 0) {
-              this.playAudioInOrder();
-            }
-          })
-        )
+        ...filteredSentences.map((item) => this.ttsFunc(item))
       );
     }
     this.partialContent = remaining;
@@ -103,18 +145,17 @@ export class StreamResponser {
       );
       if (this.partialContent.trim() !== "") {
         const text = purifyTextForTTS(this.partialContent);
-        this.speakArray.push(
-          this.ttsFunc(text).finally(() => {
-            if (!this.isPlaying) {
-              this.playAudioInOrder();
-            }
-          })
-        );
+        this.speakArray.push(this.ttsFunc(text));
       }
       this.partialContent = "";
     }
     this.textCallback?.(this.parsedSentences.join(" "));
     this.parsedSentences.length = 0;
+    
+    // Start playback after all sentences are collected
+    if (!this.isPlaying && this.speakArray.length > 0) {
+      this.playAudioInOrder();
+    }
   };
 
   getPlayEndPromise = (): Promise<void> => {
