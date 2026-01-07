@@ -21,6 +21,7 @@ export class StreamResponser {
   private parsedSentences: string[] = [];
   private isPlaying: boolean = false;
   private isStopped: boolean = false;
+  private endPartialCalled: boolean = false;
 
   constructor(
     ttsFunc: TTSFunc,
@@ -127,6 +128,8 @@ export class StreamResponser {
 
   partial = (text: string): void => {
     console.log(`Received partial text (${text.length} chars)`);
+    // Reset endPartialCalled since we're receiving new data
+    this.endPartialCalled = false;
     this.partialContent += text;
     // replace newlines with spaces
     this.partialContent = this.partialContent.replace(/\n/g, " ");
@@ -143,6 +146,7 @@ export class StreamResponser {
 
   endPartial = (): void => {
     console.log("endPartial called");
+    this.endPartialCalled = true;
     // Reset stopped flag for new conversation
     this.isStopped = false;
     
@@ -179,11 +183,17 @@ export class StreamResponser {
 
   getPlayEndPromise = (): Promise<void> => {
     return new Promise((resolve) => {
-      // If already playing or will play soon, add to resolvers
+      // Add to resolvers queue
       this.playEndResolvers.push(resolve);
-      // If nothing is queued, resolve immediately
-      if (!this.ttsPromise && !this.isPlaying) {
+      
+      // Only resolve immediately if endPartial was called AND there's nothing to play
+      if (this.endPartialCalled && !this.ttsPromise && !this.isPlaying) {
+        console.log("getPlayEndPromise: Resolving immediately (endPartial called, nothing to play)");
         resolve();
+      } else if (!this.endPartialCalled) {
+        console.log("getPlayEndPromise: Waiting for endPartial to be called");
+      } else {
+        console.log("getPlayEndPromise: Waiting for playback to complete");
       }
     });
   };
@@ -191,6 +201,7 @@ export class StreamResponser {
   stop = (): void => {
     console.log("Stopping StreamResponsor");
     this.isStopped = true;
+    this.endPartialCalled = false;
     this.ttsPromise = null;
     
     // Attempt to abort TTS request if one is in flight
