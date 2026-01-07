@@ -124,12 +124,18 @@ export class StreamResponser {
   private resolveAllPlayEnds = (): void => {
     this.playEndResolvers.forEach((resolve) => resolve());
     this.playEndResolvers.length = 0;
+    // Reset flag for next conversation
+    this.endPartialCalled = false;
   };
 
   partial = (text: string): void => {
+    // Don't process if we were stopped
+    if (this.isStopped) {
+      console.log("partial: Ignoring text because stopped flag is set");
+      return;
+    }
+    
     console.log(`Received partial text (${text.length} chars)`);
-    // Reset endPartialCalled since we're receiving new data
-    this.endPartialCalled = false;
     this.partialContent += text;
     // replace newlines with spaces
     this.partialContent = this.partialContent.replace(/\n/g, " ");
@@ -146,6 +152,13 @@ export class StreamResponser {
 
   endPartial = (): void => {
     console.log("endPartial called");
+    
+    // Don't process if we were stopped
+    if (this.isStopped) {
+      console.log("endPartial: Ignoring because stopped flag is set");
+      return;
+    }
+    
     this.endPartialCalled = true;
     // Reset stopped flag for new conversation
     this.isStopped = false;
