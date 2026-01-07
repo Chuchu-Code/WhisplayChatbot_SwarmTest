@@ -15,10 +15,12 @@ export class StreamResponser {
   private sentencesCallback?: SentencesCallback;
   private textCallback?: TextCallback;
   private partialContent: string = "";
-  private playEndResolve: () => void = () => {};
+  private playEndResolvers: Array<() => void> = [];
   private ttsPromise: Promise<TTSResult> | null = null;
+  private ttsAbortController: AbortController | null = null;
   private parsedSentences: string[] = [];
   private isPlaying: boolean = false;
+  private isStopped: boolean = false;
 
   constructor(
     ttsFunc: TTSFunc,
@@ -60,17 +62,24 @@ export class StreamResponser {
       if (!this.ttsPromise) {
         console.log("No audio to play");
         this.isPlaying = false;
-        this.playEndResolve();
+        this.resolveAllPlayEnds();
         return;
       }
 
       // Wait for TTS to complete
       const ttsResult = await this.ttsPromise;
       
+      // Check if we were stopped while waiting
+      if (this.isStopped) {
+        console.log("Playback was cancelled, skipping audio playback");
+        this.isPlaying = false;
+        return;
+      }
+      
       if (!ttsResult.filePath) {
         console.log("No audio file generated");
         this.isPlaying = false;
-        this.playEndResolve();
+        this.resolveAllPlayEnds();
         return;
       }
 
@@ -85,13 +94,18 @@ export class StreamResponser {
 
       console.log("Play completed");
       this.isPlaying = false;
-      this.playEndResolve();
+      this.resolveAllPlayEnds();
       this.ttsPromise = null;
     } catch (error) {
       console.error("Audio playback error:", error);
       this.isPlaying = false;
-      this.playEndResolve();
+      this.resolveAllPlayEnds();
     }
+  };
+
+  private resolveAllPlayEnds = (): void => {
+    this.playEndResolvers.forEach((resolve) => resolve());
+    this.playEndResolvers.length = 0;
   };
 
   partial = (text: string): void => {
@@ -109,6 +123,9 @@ export class StreamResponser {
   };
 
   endPartial = (): void => {
+    // Reset stopped flag for new conversation
+    this.isStopped = false;
+    
     if (this.partialContent) {
       this.parsedSentences.push(this.partialContent);
       this.sentencesCallback?.(this.parsedSentences);
@@ -128,7 +145,8 @@ export class StreamResponser {
         this.playAudioInOrder();
       }
     } else {
-      this.playEndResolve();
+      // Resolve immediately if no text
+      this.resolveAllPlayEnds();
     }
     
     this.partialContent = "";
@@ -137,16 +155,32 @@ export class StreamResponser {
 
   getPlayEndPromise = (): Promise<void> => {
     return new Promise((resolve) => {
-      this.playEndResolve = resolve;
+      // If already playing or will play soon, add to resolvers
+      this.playEndResolvers.push(resolve);
+      // If nothing is queued, resolve immediately
+      if (!this.ttsPromise && !this.isPlaying) {
+        resolve();
+      }
     });
   };
 
   stop = (): void => {
+    console.log("Stopping StreamResponsor");
+    this.isStopped = true;
     this.ttsPromise = null;
+    
+    // Attempt to abort TTS request if one is in flight
+    if (this.ttsAbortController) {
+      try {
+        this.ttsAbortController.abort();
+      } catch (e) {}
+      this.ttsAbortController = null;
+    }
+    
     this.partialContent = "";
     this.parsedSentences.length = 0;
     this.isPlaying = false;
-    this.playEndResolve();
+    this.resolveAllPlayEnds();
     stopPlaying();
   };
 }
