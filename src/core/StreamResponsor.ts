@@ -124,8 +124,9 @@ export class StreamResponser {
   private resolveAllPlayEnds = (): void => {
     this.playEndResolvers.forEach((resolve) => resolve());
     this.playEndResolvers.length = 0;
-    // Reset flag for next conversation
+    // Reset flags for next conversation
     this.endPartialCalled = false;
+    this.isStopped = false;
   };
 
   partial = (text: string): void => {
@@ -160,8 +161,6 @@ export class StreamResponser {
     }
     
     this.endPartialCalled = true;
-    // Reset stopped flag for new conversation
-    this.isStopped = false;
     
     if (this.partialContent) {
       console.log(`Adding final partial content (${this.partialContent.length} chars)`);
