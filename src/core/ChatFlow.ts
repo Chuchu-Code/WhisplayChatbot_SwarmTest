@@ -93,7 +93,7 @@ class ChatFlow {
     this.partialThinking = remaining;
   };
 
-  setCurrentFlow = (flowName: string): void => {
+  setCurrentFlow = async (flowName: string): Promise<void> => {
     console.log(`[${getCurrentTimeTag()}] switch to:`, flowName);
     switch (flowName) {
       case "sleep":
@@ -135,6 +135,8 @@ class ChatFlow {
         this.currentFlowName = "listening";
         // Stop playback to release ALSA device before recording
         stopAudioPlayback();
+        // Small delay to ensure device is fully released
+        await new Promise(r => setTimeout(r, 100));
         this.currentRecordFilePath = `${
           this.recordingsDir
         }/user-${Date.now()}.${recordFileFormat}`;

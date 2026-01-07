@@ -247,10 +247,18 @@ const playAudioData = (params: TTSResult): Promise<void> => {
     const audioBuffer = base64 ? Buffer.from(base64, "base64") : buffer;
     console.log("Playback duration:", audioDuration);
     
-    // Create player on-demand if not exists
-    if (!player.process) {
-      player.process = startPlayerProcess();
+    // Force cleanup of any existing player before starting new playback
+    if (player.process) {
+      console.log("Cleaning up existing player before new playback");
+      try {
+        player.process.stdin?.end();
+        player.process.kill();
+      } catch (e) {}
+      player.process = null;
     }
+    
+    // Create fresh player for this playback
+    player.process = startPlayerProcess();
     const process = player.process;
 
     if (!process) {
@@ -303,11 +311,11 @@ const playAudioData = (params: TTSResult): Promise<void> => {
 
 const stopPlaying = (): void => {
   try {
-    console.log("Stopping audio playback");
+    console.log("Stopping audio playback and releasing ALSA device");
     const process = player.process;
     if (process) {
       process.stdin?.end();
-      process.kill();
+      process.kill("SIGTERM");
     }
   } catch {}
   player.isPlaying = false;
