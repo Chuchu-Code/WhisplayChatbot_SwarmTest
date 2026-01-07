@@ -66,28 +66,65 @@ const recordAudio = (
   duration: number = 10
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
-    // Use plughw to let ALSA convert sample formats if needed and explicitly request 16-bit signed PCM
-    const cmd = `sox -t alsa plughw:${soundCardIndex},0 -t ${recordFileFormat} -c 1 -r 16000 -b 16 -e signed-integer ${outputPath} silence 1 0.1 60% 1 1.0 60%`;
     console.log(`Starting recording, maximum ${duration} seconds...`);
-    const recordingProcess = exec(cmd, (err, stdout, stderr) => {
-      currentRecordingReject = reject;
-      if (err) {
-        killAllRecordingProcesses();
-        reject(stderr);
-      } else {
-        resolve(outputPath);
-        killAllRecordingProcesses();
-      }
+    // Use spawn instead of exec to avoid buffering and allow better device control
+    const recordingProcess = spawn("sox", [
+      "-t",
+      "alsa",
+      `plughw:${soundCardIndex},0`,
+      "-t",
+      recordFileFormat,
+      "-c",
+      "1",
+      "-r",
+      "16000",
+      "-b",
+      "16",
+      "-e",
+      "signed-integer",
+      outputPath,
+      "silence",
+      "1",
+      "0.1",
+      "60%",
+      "1",
+      "1.0",
+      "60%",
+    ]);
+
+    recordingProcess.on("error", (err) => {
+      killAllRecordingProcesses();
+      reject(err);
     });
+
+    recordingProcess.stderr?.on("data", (data) => {
+      console.error(data.toString());
+    });
+
+    // Set reject handler immediately
+    currentRecordingReject = reject;
     recordingProcessList.push(recordingProcess);
 
     // Set a timeout to kill the recording process after the specified duration
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       if (recordingProcessList.includes(recordingProcess)) {
-        killAllRecordingProcesses();
+        try {
+          recordingProcess.stdin?.end();
+        } catch (e) {}
+        setTimeout(() => {
+          killAllRecordingProcesses();
+        }, 200);
         resolve(outputPath);
       }
     }, duration * 1000);
+
+    recordingProcess.on("exit", () => {
+      clearTimeout(timeout);
+      // Wait longer to ensure file is fully written to disk and ALSA device is properly released
+      setTimeout(() => {
+        resolve(outputPath);
+      }, 500);
+    });
   });
 };
 
