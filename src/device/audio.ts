@@ -257,12 +257,12 @@ const playAudioData = (params: TTSResult): Promise<void> => {
             break;
           }
           if (i < 5) {
-            await new Promise(r => setTimeout(r, 5000)); // Wait 5000ms between checks
+            await new Promise(r => setTimeout(r, 10000)); // Wait 10000ms between checks
           }
         }
         
         if (!fileFound) {
-          console.warn("WAV file not found after 30 second wait, proceeding anyway");
+          console.warn("WAV file not found after 60 second wait, proceeding anyway");
         }
         
         console.log("Playback duration:", audioDuration);
