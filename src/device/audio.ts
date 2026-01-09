@@ -244,33 +244,55 @@ const playAudioData = (params: TTSResult): Promise<void> => {
   }
   // play wav file using aplay
   if (filePath) {
-    return new Promise<void>((resolve, reject) => {
-      console.log("Playback duration:", audioDuration);
-      player.isPlaying = true;
-      const wavProcess = spawn("play", [filePath]);
-      allPlayerProcesses.push(wavProcess);
-      
-      const cleanup = () => {
-        player.isPlaying = false;
-        const idx = allPlayerProcesses.indexOf(wavProcess);
-        if (idx > -1) allPlayerProcesses.splice(idx, 1);
-        try {
-          wavProcess.kill("SIGTERM");
-        } catch (e) {}
-      };
-      
-      wavProcess.on("close", (code: number) => {
-        cleanup();
-        if (code !== 0) {
-          console.error(`Audio playback error: ${code}`);
-          reject(code);
-        } else {
-          console.log("Audio playback completed");
-          resolve();
+    return new Promise<void>(async (resolve, reject) => {
+      try {
+        console.log("Waiting for WAV file to be written:", filePath);
+        
+        // Poll for file to exist (up to 3 seconds, same pattern as image generation)
+        let fileFound = false;
+        for (let i = 0; i < 6; i++) {
+          if (require("fs").existsSync(filePath)) {
+            console.log("WAV file found on attempt", i + 1);
+            fileFound = true;
+            break;
+          }
+          if (i < 5) {
+            await new Promise(r => setTimeout(r, 5000)); // Wait 5000ms between checks
+          }
         }
-      });
-    }).catch((error) => {
-      console.error("Audio playback error:", error);
+        
+        if (!fileFound) {
+          console.warn("WAV file not found after 30 second wait, proceeding anyway");
+        }
+        
+        console.log("Playback duration:", audioDuration);
+        player.isPlaying = true;
+        const wavProcess = spawn("play", [filePath]);
+        allPlayerProcesses.push(wavProcess);
+        
+        const cleanup = () => {
+          player.isPlaying = false;
+          const idx = allPlayerProcesses.indexOf(wavProcess);
+          if (idx > -1) allPlayerProcesses.splice(idx, 1);
+          try {
+            wavProcess.kill("SIGTERM");
+          } catch (e) {}
+        };
+        
+        wavProcess.on("close", (code: number) => {
+          cleanup();
+          if (code !== 0) {
+            console.error(`Audio playback error: ${code}`);
+            reject(code);
+          } else {
+            console.log("Audio playback completed");
+            resolve();
+          }
+        });
+      } catch (error) {
+        console.error("Audio playback error:", error);
+        reject(error);
+      }
     });
   }
 
