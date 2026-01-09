@@ -27,6 +27,7 @@ const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || "http://localhost:11434";
 const ollamaModel = process.env.OLLAMA_MODEL || "deepseek-r1:1.5b";
 const ollamaEnableTools = process.env.OLLAMA_ENABLE_TOOLS === "true";
 const enableThinking = process.env.ENABLE_THINKING === "true";
+const ollamaKeepAlive = process.env.OLLAMA_KEEP_ALIVE || "5m"; // Keep model in VRAM for this duration ("0s" = unload immediately)
 
 const chatHistoryFileName = `ollama_chat_history_${moment().format(
   "YYYY-MM-DD_HH-mm-ss"
@@ -81,6 +82,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         content: msg.content,
       })),
       stream: true,
+      keep_alive: ollamaKeepAlive,
       options: {
         temperature: 0.7,
       },
