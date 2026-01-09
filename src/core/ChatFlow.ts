@@ -34,6 +34,7 @@ class ChatFlow {
   thinkingSentences: string[] = [];
   answerId: number = 0;
   enableCamera: boolean = false;
+  imageToolWasInvoked: boolean = false;
 
   constructor(options: { enableCamera?: boolean } = {}) {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
@@ -133,6 +134,7 @@ class ChatFlow {
       case "listening":
         this.answerId += 1;
         this.currentFlowName = "listening";
+        console.log(`[${getCurrentTimeTag()}] Entering listening state, answerId: ${this.answerId}`);
         // Stop ALL audio playback to release ALSA device before recording
         stopAudioPlayback();
         // Call again after short delay to catch any stragglers
@@ -148,6 +150,7 @@ class ChatFlow {
           this.currentRecordFilePath
         );
         onButtonReleased(() => {
+          console.log(`[${getCurrentTimeTag()}] User released button, stopping recording`);
           stop();
           display({
             RGB: "#ff6800", // yellow
@@ -155,11 +158,18 @@ class ChatFlow {
         });
         result
           .then(() => {
-            this.setCurrentFlow("asr");
+            if (this.currentFlowName === "listening") {
+              console.log(`[${getCurrentTimeTag()}] Recording completed successfully`);
+              this.setCurrentFlow("asr");
+            } else {
+              console.log(`[${getCurrentTimeTag()}] Recording completed but flow changed to ${this.currentFlowName}, skipping ASR`);
+            }
           })
           .catch((err) => {
-            console.error("Error during recording:", err);
-            this.setCurrentFlow("sleep");
+            console.error(`[${getCurrentTimeTag()}] Error during recording:`, err);
+            if (this.currentFlowName === "listening") {
+              this.setCurrentFlow("sleep");
+            }
           });
         display({
           status: "listening",
@@ -232,6 +242,10 @@ class ChatFlow {
             currentAnswerId === this.answerId &&
             this.partialThinkingCallback(partialThinking),
           (functionName: string, result?: string) => {
+            // Track if image generation tool was invoked
+            if (functionName === "generateImage") {
+              this.imageToolWasInvoked = true;
+            }
             if (result) {
               display({
                 text: `[${functionName}]${result}`,
@@ -245,10 +259,11 @@ class ChatFlow {
         );
         getPlayEndPromise().then(async () => {
           if (this.currentFlowName === "answer") {
-            // Wait a bit for any pending image generation to complete
-            // Check multiple times over 3 seconds
             let img = getLatestDisplayImg();
-            if (!img) {
+            
+            // Only wait for image if generateImage tool was actually invoked
+            if (!img && this.imageToolWasInvoked) {
+              console.log("Image tool was invoked, waiting up to 3 seconds for image generation to complete...");
               for (let i = 0; i < 12; i++) {
                 await new Promise(r => setTimeout(r, 5000));
                 img = getLatestDisplayImg();
@@ -264,6 +279,9 @@ class ChatFlow {
             } else {
               this.setCurrentFlow("sleep");
             }
+            
+            // Reset flag for next conversation
+            this.imageToolWasInvoked = false;
           }
         });
         onButtonPressed(() => {

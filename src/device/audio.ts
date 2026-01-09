@@ -132,6 +132,9 @@ const recordAudioManually = (
   outputPath: string
 ): { result: Promise<string>; stop: () => void } => {
   let stopFunc: () => void = noop;
+  let isResolved = false;
+  let timeoutId: NodeJS.Timeout | null = null;
+  
   const result = new Promise<string>((resolve, reject) => {
     currentRecordingReject = reject;
     const recordingProcess = spawn("sox", [
@@ -152,15 +155,21 @@ const recordAudioManually = (
     ]);
 
     recordingProcess.on("error", (err) => {
-      killAllRecordingProcesses();
-      reject(err);
+      if (!isResolved) {
+        isResolved = true;
+        killAllRecordingProcesses();
+        if (timeoutId) clearTimeout(timeoutId);
+        reject(err);
+      }
     });
 
     recordingProcess.stderr?.on("data", (data) => {
       console.error(data.toString());
     });
     recordingProcessList.push(recordingProcess);
+    
     stopFunc = () => {
+      console.log("Stopping recording manually");
       // Close stdin first to signal EOF to sox
       try {
         recordingProcess.stdin?.end();
@@ -170,13 +179,29 @@ const recordAudioManually = (
         killAllRecordingProcesses();
       }, 200);
     };
+    
     recordingProcess.on("exit", () => {
-      // Wait longer to ensure file is fully written to disk
-      // and ALSA device is properly released
-      setTimeout(() => {
-        resolve(outputPath);
-      }, 500);
+      if (!isResolved) {
+        isResolved = true;
+        if (timeoutId) clearTimeout(timeoutId);
+        // Wait longer to ensure file is fully written to disk
+        // and ALSA device is properly released
+        setTimeout(() => {
+          resolve(outputPath);
+        }, 500);
+      }
     });
+    
+    // Fallback timeout - if recording doesn't exit after 10 minutes, force resolve
+    // This is a safety net for when sox hangs, not for normal operation
+    timeoutId = setTimeout(() => {
+      if (!isResolved) {
+        console.warn("Recording timeout (60s) reached, force stopping");
+        isResolved = true;
+        killAllRecordingProcesses();
+        resolve(outputPath);
+      }
+    }, 60000); // 1 minute
   });
   return {
     result,
