@@ -9,6 +9,7 @@ dotenv.config();
 
 const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || "http://localhost:11434";
 const ollamaVisionModel = process.env.OLLAMA_VISION_MODEL || "qwen3-vl:2b";
+const ollamaVisionKeepAlive = process.env.OLLAMA_VISION_KEEP_ALIVE || "5m"; // Keep vision model in VRAM for this duration
 
 export const addOllamaVisionTool = (visionTools: LLMTool[]) => {
   visionTools.push({
@@ -47,6 +48,7 @@ export const addOllamaVisionTool = (visionTools: LLMTool[]) => {
         ],
         think: false,
         stream: false,
+        keep_alive: ollamaVisionKeepAlive,
       });
       const content = get(response.data, "message.content", "");
       return (
