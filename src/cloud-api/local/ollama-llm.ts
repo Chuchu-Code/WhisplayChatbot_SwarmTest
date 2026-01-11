@@ -74,6 +74,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   let partialThinking = "";
   const functionCallsPackages: OllamaFunctionCall[][] = [];
   let streamBuffer = ""; // Buffer for incomplete JSON lines
+  let lastToolCallId = ""; // Track last tool call ID to prevent duplicates
 
   try {
     const requestBody: any = {
@@ -142,7 +143,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           // Handle tool calls from Ollama
           if (parsedData.message?.tool_calls) {
             // tool_calls format: [[{"function":{"index":0,"name":"setVolume","arguments":{"percent":50}}}]]
-            functionCallsPackages.push(parsedData.message.tool_calls);
+            // Deduplicate: only add if this is a different set of tool calls than the last one
+            const toolCallsStr = JSON.stringify(parsedData.message.tool_calls);
+            if (toolCallsStr !== lastToolCallId) {
+              lastToolCallId = toolCallsStr;
+              functionCallsPackages.push(parsedData.message.tool_calls);
+              console.log(`Tool calls detected: ${parsedData.message.tool_calls.map((tc: any) => tc.function?.name).join(", ")}`);
+            }
           }
         } catch (error) {
           console.error("Error parsing data:", error, line);
