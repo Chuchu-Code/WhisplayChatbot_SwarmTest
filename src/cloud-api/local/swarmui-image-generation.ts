@@ -202,7 +202,7 @@ export const addSwarmUIGenerationTool = (imageGenerationTools: LLMTool[]) => {
           writeFileSync(imagePath, imageBuffer);
           setLatestGenImg(imagePath);
           console.log(`Image saved as ${imagePath}`);
-          return `${ToolReturnTag.Success}Image file saved.`;
+          return `${ToolReturnTag.Response}I've generated the image. Let me show it to you.`;
         }
 
         if (result.error) {
@@ -227,7 +227,7 @@ export const addSwarmUIGenerationTool = (imageGenerationTools: LLMTool[]) => {
         writeFileSync(imagePath, imageBuffer);
         setLatestGenImg(imagePath);
         console.log(`Image saved as ${imagePath}`);
-        return `${ToolReturnTag.Success}Image file saved.`;
+        return `${ToolReturnTag.Response}I've generated the image. Let me show it to you.`;
       } catch (error) {
         console.error("Error generating image with SwarmUI:", error);
         return `${ToolReturnTag.Error}Image generation failed: ${error instanceof Error ? error.message : String(error)}`;

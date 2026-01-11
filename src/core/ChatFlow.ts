@@ -263,7 +263,7 @@ class ChatFlow {
             
             // Only wait for image if generateImage tool was actually invoked
             if (!img && this.imageToolWasInvoked) {
-              console.log("Image tool was invoked, waiting up to 3 seconds for image generation to complete...");
+              console.log("Image tool was invoked, waiting up to 60 seconds for image generation to complete...");
               for (let i = 0; i < 12; i++) {
                 await new Promise(r => setTimeout(r, 5000));
                 img = getLatestDisplayImg();
