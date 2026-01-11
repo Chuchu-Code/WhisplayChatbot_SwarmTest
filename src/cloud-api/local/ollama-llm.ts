@@ -188,7 +188,11 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
                 name,
                 await func(args)
                   .then((res) => {
-                    invokeFunctionCallback?.(name! as string, res);
+                    // Only invoke callback with result if it doesn't start with [response]
+                    // (those are handled separately via stimulateStreamResponse)
+                    if (!res.startsWith(ToolReturnTag.Response)) {
+                      invokeFunctionCallback?.(name! as string, res);
+                    }
                     return res;
                   })
                   .catch((err) => {
