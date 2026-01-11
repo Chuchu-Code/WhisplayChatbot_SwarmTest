@@ -26,7 +26,6 @@ export const stimulateStreamResponse = async ({
     index += 5;
     await new Promise((res) => setTimeout(res, 1000));
   }
-  partialCallback(content);
   endResolve();
   endCallback();
 };
