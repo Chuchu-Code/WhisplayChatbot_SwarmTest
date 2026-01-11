@@ -41,7 +41,7 @@ const fastKokoroTTS = async (
       },
       {
         responseType: "arraybuffer",
-        timeout: 30000,
+        timeout: 120000, // 120 second timeout for long responses
       }
     );
 

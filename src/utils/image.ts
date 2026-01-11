@@ -30,6 +30,12 @@ loadLatestGenImg();
 
 // 加载最新拍摄的图片路径到list中
 const loadLatestCapturedImg = () => {
+  // Check if directory exists before reading
+  if (!fs.existsSync(cameraDir)) {
+    console.log("Camera directory does not exist yet:", cameraDir);
+    return;
+  }
+  
   const files = fs.readdirSync(cameraDir);
   const images = files
     .filter((file) => /\.(jpg|png)$/.test(file))
@@ -43,6 +49,30 @@ const loadLatestCapturedImg = () => {
 };
 
 loadLatestCapturedImg();
+
+// Refresh captured images from disk (call this before trying to access a captured image)
+const refreshCapturedImgList = () => {
+  if (!fs.existsSync(cameraDir)) {
+    console.log("Camera directory does not exist:", cameraDir);
+    capturedImgList.length = 0;
+    return;
+  }
+  
+  const files = fs.readdirSync(cameraDir);
+  const images = files
+    .filter((file) => /\.(jpg|png)$/.test(file))
+    .sort((a, b) => {
+      const aTime = fs.statSync(path.join(cameraDir, a)).mtime.getTime();
+      const bTime = fs.statSync(path.join(cameraDir, b)).mtime.getTime();
+      return aTime - bTime;
+    })
+    .map((file) => path.join(cameraDir, file));
+  
+  // Replace the entire list with fresh data from disk
+  capturedImgList.length = 0;
+  capturedImgList.push(...images);
+  console.log(`Refreshed captured images: ${capturedImgList.length} files found in ${cameraDir}`);
+};
 
 export const setLatestGenImg = (imgPath: string) => {
   genImgList.push(imgPath);
@@ -95,6 +125,8 @@ export const showLatestCapturedImg = () => {
 };
 
 export const getLatestShowedImage = () => {
+  // Refresh captured images from disk in case new ones were added
+  refreshCapturedImgList();
   return latestShowedImg;
 };
 
