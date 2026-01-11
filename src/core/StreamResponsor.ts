@@ -99,10 +99,10 @@ export class StreamResponser {
       // Get actual duration from the WAV file
       const actualDuration = this.getWavDuration(ttsResult.filePath);
       // Generous buffer for low-powered devices and playback variance
-      const durationWithBuffer = actualDuration + 15000; // Add 15 second safety buffer
+      const durationWithBuffer = actualDuration + 5000; // Add 5 second safety buffer
 
       // Play audio - timer starts now, after TTS is complete
-      console.log(`Playing audio (actual: ${actualDuration}ms + 15s buffer = ${durationWithBuffer}ms)`);
+      console.log(`Playing audio (actual: ${actualDuration}ms + 5s buffer = ${durationWithBuffer}ms)`);
       try {
         await playAudioData({ filePath: ttsResult.filePath, duration: durationWithBuffer });
         console.log("Audio playback completed successfully");
