@@ -73,6 +73,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   let partialAnswer = "";
   let partialThinking = "";
   const functionCallsPackages: OllamaFunctionCall[][] = [];
+  let streamBuffer = ""; // Buffer for incomplete JSON lines
 
   try {
     const requestBody: any = {
@@ -111,7 +112,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 
     response.data.on("data", (chunk: Buffer) => {
       const data = chunk.toString();
-      const dataLines = data.split("\n");
+      streamBuffer += data; // Append to buffer
+      const dataLines = streamBuffer.split("\n");
+      
+      // Keep the last incomplete line in the buffer (won't end with \n)
+      streamBuffer = dataLines.pop() || "";
+      
+      // Process all complete lines
       const filteredLines = dataLines.filter((line) => line.trim() !== "");
 
       for (const line of filteredLines) {
