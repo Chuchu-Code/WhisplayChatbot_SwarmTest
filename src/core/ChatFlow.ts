@@ -24,6 +24,25 @@ import { StreamResponser } from "./StreamResponsor";
 import { cameraDir, recordingsDir } from "../utils/dir";
 import { getLatestDisplayImg, setLatestCapturedImg } from "../utils/image";
 
+/**
+ * ChatFlow manages the conversation state machine and coordinates:
+ * - Audio recording
+ * - Speech recognition (ASR)
+ * - LLM conversation
+ * - Text-to-speech (TTS)
+ * - Image generation and display
+ * 
+ * INTERRUPT & CLEANUP BEHAVIOR:
+ * When user presses button during any state to start a new recording:
+ * 1. answerId is incremented, causing LLM callbacks to stop processing
+ * 2. streamResponser.stop() is called, which:
+ *    - Sets isStopped flag (prevents new TTS/audio from starting)
+ *    - Calls stopPlaying() to kill audio processes
+ *    - Resolves all pending playback promises
+ * 3. stopAudioPlayback() kills all ALSA audio player processes
+ * 4. Ongoing image generation completes but results are ignored (answerId mismatch)
+ * 5. TTS requests may complete but audio won't play (isStopped=true)
+ */
 class ChatFlow {
   currentFlowName: string = "";
   recordingsDir: string = "";
@@ -135,13 +154,15 @@ class ChatFlow {
         this.answerId += 1;
         this.currentFlowName = "listening";
         console.log(`[${getCurrentTimeTag()}] Entering listening state, answerId: ${this.answerId}`);
-        // Stop ALL audio playback to release ALSA device before recording
-        stopAudioPlayback();
-        // Call again after short delay to catch any stragglers
-        await new Promise(r => setTimeout(r, 50));
-        stopAudioPlayback();
-        // Final delay to ensure device is fully released
-        await new Promise(r => setTimeout(r, 100));
+        
+        // Stop all ongoing processes before starting new recording
+        console.log(`[${getCurrentTimeTag()}] Stopping all ongoing processes...`);
+        this.streamResponser.stop(); // Stop TTS and audio playback
+        stopAudioPlayback(); // Ensure audio device is released
+        
+        // Short delay to ensure everything is cleaned up
+        await new Promise(r => setTimeout(r, 150));
+        
         this.currentRecordFilePath = `${
           this.recordingsDir
         }/user-${Date.now()}.${recordFileFormat}`;
@@ -216,6 +237,9 @@ class ChatFlow {
         this.currentFlowName = "answer";
         const currentAnswerId = this.answerId;
         onButtonPressed(() => {
+          console.log(`[${getCurrentTimeTag()}] Button pressed during answer, stopping all processes`);
+          this.streamResponser.stop(); // Stop TTS and audio playback
+          stopAudioPlayback(); // Extra cleanup
           this.setCurrentFlow("listening");
         });
         onButtonReleased(noop);
@@ -292,7 +316,10 @@ class ChatFlow {
         break;
       case "image":
         onButtonPressed(() => {
+          console.log(`[${getCurrentTimeTag()}] Button pressed during image display, clearing and transitioning`);
           display({ image: "" });
+          this.streamResponser.stop(); // Ensure cleanup
+          stopAudioPlayback();
           this.setCurrentFlow("listening");
         });
         onButtonReleased(noop);
