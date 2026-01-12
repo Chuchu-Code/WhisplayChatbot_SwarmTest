@@ -10,6 +10,10 @@ type TTSFunc = (text: string) => Promise<TTSResult>;
 type SentencesCallback = (sentences: string[]) => void;
 type TextCallback = (text: string) => void;
 
+// Global generation counter - increments for each new response
+let ttsGenerationId = 0;
+let lastTtsGenerationId = 0;
+
 export class StreamResponser {
   private ttsFunc: TTSFunc;
   private sentencesCallback?: SentencesCallback;
@@ -22,6 +26,8 @@ export class StreamResponser {
   private isPlaying: boolean = false;
   private isStopped: boolean = false;
   private endPartialCalled: boolean = false;
+  private currentTtsFilePath: string | null = null;
+  private generationId: number = 0;
 
   constructor(
     ttsFunc: TTSFunc,
@@ -31,6 +37,10 @@ export class StreamResponser {
     this.ttsFunc = (text) => ttsFunc(text);
     this.sentencesCallback = sentencesCallback;
     this.textCallback = textCallback;
+    
+    // Assign a unique generation ID for this response
+    this.generationId = ++ttsGenerationId;
+    console.log(`StreamResponsor created with generation ID: ${this.generationId}`);
   }
 
   private getWavDuration = (filePath: string): number => {
@@ -50,6 +60,20 @@ export class StreamResponser {
       console.warn("Failed to read WAV duration:", error);
     }
     return 0;
+  };
+
+  private cleanupTtsFile = (): void => {
+    if (this.currentTtsFilePath) {
+      try {
+        if (fs.existsSync(this.currentTtsFilePath)) {
+          fs.unlinkSync(this.currentTtsFilePath);
+          console.log(`Cleaned up TTS file: ${this.currentTtsFilePath}`);
+        }
+      } catch (error) {
+        console.warn(`Failed to delete TTS file ${this.currentTtsFilePath}:`, error);
+      }
+      this.currentTtsFilePath = null;
+    }
   };
 
   private playAudioInOrder = async (): Promise<void> => {
@@ -83,6 +107,16 @@ export class StreamResponser {
       // Check if we were stopped while waiting
       if (this.isStopped) {
         console.log("Playback was cancelled, skipping audio playback");
+        this.cleanupTtsFile();
+        this.isPlaying = false;
+        this.resolveAllPlayEnds();
+        return;
+      }
+
+      // Check if we're still the current generation (not superseded by a newer response)
+      if (this.generationId !== ttsGenerationId) {
+        console.log(`Skipping playback: generation ${this.generationId} is outdated (current: ${ttsGenerationId})`);
+        this.cleanupTtsFile();
         this.isPlaying = false;
         this.resolveAllPlayEnds();
         return;
@@ -95,6 +129,9 @@ export class StreamResponser {
         return;
       }
 
+      // Track the current TTS file for cleanup
+      this.currentTtsFilePath = ttsResult.filePath;
+      lastTtsGenerationId = this.generationId;
       console.log("Audio file path:", ttsResult.filePath);
       // Get actual duration from the WAV file
       const actualDuration = this.getWavDuration(ttsResult.filePath);
@@ -111,6 +148,8 @@ export class StreamResponser {
         throw playError;
       }
 
+      // Clean up TTS file after successful playback
+      this.cleanupTtsFile();
       this.isPlaying = false;
       this.resolveAllPlayEnds();
       this.ttsPromise = null;
@@ -215,6 +254,16 @@ export class StreamResponser {
     this.isStopped = true;
     this.endPartialCalled = false;
     this.ttsPromise = null;
+    
+    // Mark all older generations as outdated
+    // This prevents any pending playback from older responses
+    if (this.generationId === ttsGenerationId) {
+      ttsGenerationId++;
+      console.log(`Incremented generation ID on stop: now ${ttsGenerationId}`);
+    }
+    
+    // Clean up TTS file if one was created
+    this.cleanupTtsFile();
     
     // Attempt to abort TTS request if one is in flight
     if (this.ttsAbortController) {
