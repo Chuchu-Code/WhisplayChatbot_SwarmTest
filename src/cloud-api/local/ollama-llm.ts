@@ -28,6 +28,7 @@ const ollamaModel = process.env.OLLAMA_MODEL || "deepseek-r1:1.5b";
 const ollamaEnableTools = process.env.OLLAMA_ENABLE_TOOLS === "true";
 const enableThinking = process.env.ENABLE_THINKING === "true";
 const ollamaKeepAlive = process.env.OLLAMA_KEEP_ALIVE || "5m"; // Keep model in VRAM for this duration ("0s" = unload immediately)
+const ollamaContextLength = process.env.OLLAMA_CONTEXT_LENGTH ? parseInt(process.env.OLLAMA_CONTEXT_LENGTH, 10) : undefined; // num_ctx: context window size (undefined = model default)
 
 const chatHistoryFileName = `ollama_chat_history_${moment().format(
   "YYYY-MM-DD_HH-mm-ss"
@@ -89,6 +90,11 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         temperature: 0.7,
       },
     };
+
+    // Set context length if specified (limits how much history is visible to the model)
+    if (ollamaContextLength !== undefined) {
+      requestBody.options.num_ctx = ollamaContextLength;
+    }
 
     // Only add parameters if they're supported
     if (enableThinking) {

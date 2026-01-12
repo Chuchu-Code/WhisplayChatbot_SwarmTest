@@ -7,6 +7,7 @@ import { transformToGeminiType } from "../utils";
 import dotenv from "dotenv";
 import { addImageGenerationTools } from "./image-generation";
 import { addVisionTools } from "./vision";
+import { resetChatHistory } from "../cloud-api/server";
 
 dotenv.config();
 
@@ -78,6 +79,19 @@ const defaultTools: LLMTool[] = [
         `Current volume: ${currentLogPercent}%, New volume: ${newAmixerValue}%`
       );
       return `Volume decreased by 10%, now at ${newAmixerValue}%`;
+    },
+  },
+  // reset context
+  {
+    type: "function",
+    function: {
+      name: "resetContext",
+      description: "clear the conversation history and start fresh with a new context",
+      parameters: {},
+    },
+    func: async (params) => {
+      resetChatHistory();
+      return "Context has been reset. Starting fresh conversation.";
     },
   },
 ];
