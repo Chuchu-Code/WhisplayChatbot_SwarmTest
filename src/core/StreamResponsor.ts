@@ -255,13 +255,6 @@ export class StreamResponser {
     this.endPartialCalled = false;
     this.ttsPromise = null;
     
-    // Mark all older generations as outdated
-    // This prevents any pending playback from older responses
-    if (this.generationId === ttsGenerationId) {
-      ttsGenerationId++;
-      console.log(`Incremented generation ID on stop: now ${ttsGenerationId}`);
-    }
-    
     // Clean up TTS file if one was created
     this.cleanupTtsFile();
     
